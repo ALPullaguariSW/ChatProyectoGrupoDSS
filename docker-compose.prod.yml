@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: secure-chat-mongo-prod
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: SecurePass123!
+    volumes:
+      - mongo_data_prod:/data/db
+    networks:
+      - chat-network
+    command: mongod --auth
+
+  redis:
+    image: redis:7-alpine
+    container_name: secure-chat-redis-prod
+    restart: always
+    command: redis-server --requirepass RedisPass456!
+    volumes:
+      - redis_data_prod:/data
+    networks:
+      - chat-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: secure-chat-backend-prod
+    restart: always
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - chat-network
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./cliente
+      dockerfile: Dockerfile.prod
+      args:
+        REACT_APP_API_URL: /api
+        REACT_APP_SOCKET_URL: ""
+    container_name: secure-chat-frontend-prod
+    restart: always
+    networks:
+      - chat-network
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data_prod:
+  redis_data_prod:
+
+networks:
+  chat-network:
+    driver: bridge

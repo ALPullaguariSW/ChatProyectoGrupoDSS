@@ -1,0 +1,27 @@
+{
+  "name": "appchat",
+  "version": "1.0.0",
+  "description": "Appchat",
+  "keywords": [],
+  "license": "ISC",
+  "author": "Axel Pullaguari",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "form-data": "^4.0.5",
+    "primeflex": "^4.0.0",
+    "primeicons": "^7.0.0",
+    "primereact": "^10.9.5",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "axios": "^1.13.2",
+    "socket.io-client": "^4.8.1"
+  }
+}
