@@ -43,6 +43,16 @@ interface RoomProviderProps {
   children: ReactNode;
 }
 
+// Generar sessionId único por pestaña
+const getSessionId = () => {
+  let sessionId = sessionStorage.getItem('chatSessionId');
+  if (!sessionId) {
+    sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    sessionStorage.setItem('chatSessionId', sessionId);
+  }
+  return sessionId;
+};
+
 export const RoomProvider: React.FC<RoomProviderProps> = ({ children }) => {
   const { token } = useAuth();
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
@@ -50,6 +60,9 @@ export const RoomProvider: React.FC<RoomProviderProps> = ({ children }) => {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [currentNickname, setCurrentNickname] = useState('');
+  const [sessionId] = useState(getSessionId());
+
+  console.log('[RoomContext] SessionId:', sessionId);
 
   // Conectar socket cuando hay token
   useEffect(() => {
@@ -62,7 +75,9 @@ export const RoomProvider: React.FC<RoomProviderProps> = ({ children }) => {
       setMessages([]);
       setTypingUsers([]);
       setCurrentNickname('');
-      localStorage.removeItem('activeRoomPin');
+      // Limpiar localStorage con clave por sesión
+      localStorage.removeItem(`activeRoomPin_${sessionId}`);
+      sessionStorage.clear();
     }
 
     return () => {
@@ -298,7 +313,9 @@ export const RoomProvider: React.FC<RoomProviderProps> = ({ children }) => {
       setMessages([]);
       setTypingUsers([]);
       setCurrentNickname('');
-      localStorage.removeItem('activeRoomPin');
+      // Usar sessionId para limpiar solo esta sesión
+      localStorage.removeItem(`activeRoomPin_${sessionId}`);
+      console.log('[RoomContext] Sala abandonada para session:', sessionId);
     }
   };
 

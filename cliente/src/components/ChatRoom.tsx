@@ -26,6 +26,8 @@ export const ChatRoom: React.FC = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'warning'>('success');
   const [showUsers, setShowUsers] = useState(false);
+  // Nuevo: Estado para alertas de estenografía
+  const [stegoAlert, setStegoAlert] = useState<{show: boolean, type: 'danger'|'safe', file: string, entropy?: number, details?: string} | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -140,28 +142,51 @@ export const ChatRoom: React.FC = () => {
         
         if (stegoCheck?.checked) {
           if (stegoCheck.passed === false) {
-            // Archivo SOSPECHOSO detectado
+            // Archivo SOSPECHOSO detectado - MOSTRAR ALERTA ROJA
+            setStegoAlert({
+              show: true,
+              type: 'danger',
+              file: file.name,
+              entropy: stegoCheck.entropy,
+              details: stegoCheck.details || 'Posible contenido oculto'
+            });
+            
             showNotification(
-              `⚠️ ARCHIVO SOSPECHOSO DETECTADO: ${file.name} - ${stegoCheck.details || 'Posible contenido oculto'}`,
+              `🚨 ARCHIVO SOSPECHOSO: ${file.name} - Entropía: ${stegoCheck.entropy?.toFixed(2)}`,
               'warning'
             );
             
             // Mensaje en el chat con advertencia
             await sendMessage(
-              `🚨 [ADVERTENCIA] Archivo sospechoso: ${fileValidation.sanitized} (${(file.size / 1024).toFixed(2)} KB) - Entropía: ${stegoCheck.entropy?.toFixed(2) || 'N/A'}`,
+              `🚨 [ADVERTENCIA ESTENOGRAFÍA] Archivo: ${fileValidation.sanitized} | Tamaño: ${(file.size / 1024).toFixed(2)} KB | Entropía Shannon: ${stegoCheck.entropy?.toFixed(4)} (>${process.env.REACT_APP_ENTROPY_THRESHOLD || 7.5}) | Estado: SOSPECHOSO`,
               false
             );
+            
+            // Auto-cerrar alerta después de 10 segundos
+            setTimeout(() => setStegoAlert(null), 10000);
+            
           } else {
-            // Archivo SEGURO
+            // Archivo SEGURO - MOSTRAR ALERTA VERDE
+            setStegoAlert({
+              show: true,
+              type: 'safe',
+              file: file.name,
+              entropy: stegoCheck.entropy,
+              details: 'Archivo verificado sin anomalías'
+            });
+            
             showNotification(
-              `✅ Archivo verificado y seguro: ${file.name}`,
+              `✅ Archivo seguro: ${file.name} - Entropía: ${stegoCheck.entropy?.toFixed(2)}`,
               'success'
             );
             
             await sendMessage(
-              `📎 Archivo seguro: ${fileValidation.sanitized} (${(file.size / 1024).toFixed(2)} KB)`,
+              `✅ [ARCHIVO SEGURO] ${fileValidation.sanitized} (${(file.size / 1024).toFixed(2)} KB) | Entropía: ${stegoCheck.entropy?.toFixed(4)} | Verificado`,
               false
             );
+            
+            // Auto-cerrar alerta después de 5 segundos
+            setTimeout(() => setStegoAlert(null), 5000);
           }
         } else {
           // Análisis no realizado (deshabilitado)
@@ -287,6 +312,68 @@ export const ChatRoom: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* NUEVO: Banner de Alerta de Estenografía */}
+      {stegoAlert && stegoAlert.show && (
+        <div className={`animate-fade-in ${stegoAlert.type === 'danger' ? 'bg-red-50 border-b-4 border-red-500' : 'bg-green-50 border-b-4 border-green-500'}`}>
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 flex-1">
+                {stegoAlert.type === 'danger' ? (
+                  <div className="flex-shrink-0 w-12 h-12 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="flex-shrink-0 w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h4 className={`text-lg font-bold ${stegoAlert.type === 'danger' ? 'text-red-900' : 'text-green-900'} mb-1`}>
+                    {stegoAlert.type === 'danger' ? '🚨 ARCHIVO SOSPECHOSO DETECTADO' : '✅ ARCHIVO SEGURO VERIFICADO'}
+                  </h4>
+                  <p className={`text-sm font-medium ${stegoAlert.type === 'danger' ? 'text-red-800' : 'text-green-800'} mb-2`}>
+                    {stegoAlert.file}
+                  </p>
+                  <div className={`flex flex-wrap gap-3 text-xs ${stegoAlert.type === 'danger' ? 'text-red-700' : 'text-green-700'}`}>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">Entropía Shannon:</span>
+                      <span className={`px-2 py-0.5 rounded font-mono ${stegoAlert.type === 'danger' ? 'bg-red-200 text-red-900' : 'bg-green-200 text-green-900'}`}>
+                        {stegoAlert.entropy?.toFixed(4) || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">Umbral:</span>
+                      <span className="font-mono">7.5000</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">Estado:</span>
+                      <span className={`px-2 py-0.5 rounded font-bold ${stegoAlert.type === 'danger' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}>
+                        {stegoAlert.type === 'danger' ? 'SOSPECHOSO' : 'SEGURO'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className={`text-xs ${stegoAlert.type === 'danger' ? 'text-red-600' : 'text-green-600'} mt-2`}>
+                    {stegoAlert.details}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setStegoAlert(null)}
+                className={`flex-shrink-0 p-1 rounded-lg hover:bg-opacity-20 transition ${stegoAlert.type === 'danger' ? 'hover:bg-red-500' : 'hover:bg-green-500'}`}
+              >
+                <svg className={`w-5 h-5 ${stegoAlert.type === 'danger' ? 'text-red-700' : 'text-green-700'}`} fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
